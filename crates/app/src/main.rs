@@ -1,3 +1,7 @@
+use core::read_xml_dir_and_write;
 fn main() -> std::io::Result<()> {
-    core::read_xml_dir_and_write("docs.gl/gl4","index.json")
+    for file_path in std::env::args().skip(1).take(1) {
+        read_xml_dir_and_write(file_path, "index.json")?;
+    }
+    Ok(())
 }

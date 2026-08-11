@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 core = {path = "../core"}
 common = {path = "../common"}
+tiny_http = "0.12.0"

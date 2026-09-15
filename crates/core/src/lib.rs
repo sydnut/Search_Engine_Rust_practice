@@ -21,6 +21,9 @@ fn check_xml_ext(file_path: impl AsRef<Path>) -> bool {
         }
     }
 }
+/// read the path of xml path and convert its string into the return value
+/// ___
+/// promise that every file path has been checked before
 fn read_xml_file(file_path: impl AsRef<Path>) -> std::io::Result<String> {
     let file = File::open(file_path)?;
     let reader = EventReader::new(file);
@@ -37,11 +40,31 @@ fn read_xml_file(file_path: impl AsRef<Path>) -> std::io::Result<String> {
     }
     Ok(buffer)
 }
+/// tokenize the file content into the `TFIndex`
+fn tokenize_file(dir_path: &impl AsRef<Path>, res: &mut TFIndex) -> std::io::Result<()> {
+    let content = read_xml_file(dir_path.as_ref())?
+        .chars()
+        .collect::<Vec<_>>();
+    let mut tf: TF = TF::new();
+    for token in lexer::Lexer::new(&content) {
+        let term = token
+            .iter()
+            .map(|c| c.to_ascii_uppercase())
+            .collect::<String>();
+        let fre = tf.entry(term).or_insert(0);
+        *fre += 1;
+    }
+    res.insert(PathBuf::from(dir_path.as_ref()), tf);
+    Ok(())
+}
 /// this fn will recursively watch all the subfiles and accumulate into `res`
 fn for_each_file(dir_path: impl AsRef<Path>, res: &mut TFIndex) -> std::io::Result<()> {
     //base case 文件
     if dir_path.as_ref().is_file() {
-        tokenize_file(&dir_path, res)?;
+        let path = dir_path.as_ref();
+        if check_xml_ext(path) {
+            tokenize_file(&path, res)?;
+        }
         return Ok(());
     }
     for file in fs::read_dir(dir_path)? {
@@ -59,24 +82,7 @@ fn for_each_file(dir_path: impl AsRef<Path>, res: &mut TFIndex) -> std::io::Resu
     }
     Ok(())
 }
-
-fn tokenize_file(dir_path: &impl AsRef<Path>, res: &mut TFIndex) -> std::io::Result<()> {
-    let content = read_xml_file(dir_path.as_ref())?
-        .chars()
-        .collect::<Vec<_>>();
-    let mut tf: TF = TF::new();
-    for token in lexer::Lexer::new(&content) {
-        let term = token
-            .iter()
-            .map(|c| c.to_ascii_uppercase())
-            .collect::<String>();
-        let fre = tf.entry(term).or_insert(0);
-        *fre += 1;
-    }
-    res.insert(PathBuf::from(dir_path.as_ref()), tf);
-    Ok(())
-}
-
+/// 驱动函数，读取给定文件夹，然后解析输出到对应文件
 pub fn read_xml_dir_and_write(
     dir_path: impl AsRef<Path>,
     target_path: impl AsRef<Path>,
@@ -92,7 +98,9 @@ pub fn read_xml_dir_and_write(
     Ok(())
 }
 
-pub fn read_xml_dir(dir_path: impl AsRef<Path>) -> std::io::Result<()> {
+//unused
+#[allow(unused)]
+fn read_xml_dir(dir_path: impl AsRef<Path>) -> std::io::Result<()> {
     let mut res: TFIndex = TFIndex::new();
     for_each_file(dir_path, &mut res)?;
     for (path, tf) in res {

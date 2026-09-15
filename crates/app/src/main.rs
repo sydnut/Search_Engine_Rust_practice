@@ -1,4 +1,4 @@
-use core::read_xml_dir_and_write;
+use search_core::read_xml_dir_and_write;
 use std::error::Error;
 use std::fs::File;
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
@@ -59,14 +59,10 @@ fn serve_request(req: Request) -> Result<(), Box<dyn Error>> {
                     eprintln!("ERROR: failed to respond: {}", err);
                 }),
         },
-        Method::Post =>{
-            match req.url() {
-                "/api/search" =>{
-
-                }
-                _ => todo!()
-            }
-        }
+        Method::Post => match req.url() {
+            "/api/search" => {}
+            _ => todo!(),
+        },
         _ => todo!(),
     }
     Ok(())

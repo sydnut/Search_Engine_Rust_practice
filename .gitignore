@@ -6,3 +6,4 @@ docs.gl/**
 target/**
 /docs.gl/
 .idea/
+*.json

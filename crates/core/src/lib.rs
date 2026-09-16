@@ -3,9 +3,9 @@ use std::ffi::OsStr;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 use xml::reader::{EventReader, XmlEvent};
-mod lexer;
-type TF = HashMap<String, usize>;
-type TFIndex = HashMap<PathBuf, TF>;
+pub mod lexer;
+pub type TF = HashMap<String, usize>;
+pub type TFIndex = HashMap<PathBuf, TF>;
 /// return `true` if it can be xml parser parsed
 fn check_xml_ext(file_path: impl AsRef<Path>) -> bool {
     //校验拓展名
@@ -47,11 +47,7 @@ fn tokenize_file(dir_path: &impl AsRef<Path>, res: &mut TFIndex) -> std::io::Res
         .collect::<Vec<_>>();
     let mut tf: TF = TF::new();
     for token in lexer::Lexer::new(&content) {
-        let term = token
-            .iter()
-            .map(|c| c.to_ascii_uppercase())
-            .collect::<String>();
-        let fre = tf.entry(term).or_insert(0);
+        let fre = tf.entry(token).or_insert(0);
         *fre += 1;
     }
     res.insert(PathBuf::from(dir_path.as_ref()), tf);
@@ -119,7 +115,7 @@ mod tests {
             .collect::<Vec<_>>();
         let lexer = lexer::Lexer::new(&content);
         for token in lexer {
-            println!("{token}", token = token.iter().collect::<String>());
+            println!("{token}");
         }
         Ok(())
     }

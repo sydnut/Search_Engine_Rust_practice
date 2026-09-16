@@ -24,22 +24,27 @@ impl<'a> Lexer<'a> {
         }
         self._yield(n)
     }
-    pub fn next_token(&mut self) -> Option<&'a [char]> {
+    pub fn next_token(&mut self) -> Option<String> {
         self.trim_left();
         if self.content.is_empty() {
             return None;
         }
         if self.content[0].is_alphabetic() {
-            Some(self._yield_while(|c| c.is_alphanumeric()))
+            Some(
+                self._yield_while(|c| c.is_alphanumeric())
+                    .iter()
+                    .map(|c| c.to_ascii_uppercase())
+                    .collect(),
+            )
         } else if self.content[0].is_numeric() {
-            Some(self._yield_while(|c| c.is_numeric()))
+            Some(self._yield_while(|c| c.is_numeric()).iter().collect())
         } else {
-            Some(self._yield(1))
+            Some(self._yield(1).iter().collect())
         }
     }
 }
 impl<'a> Iterator for Lexer<'a> {
-    type Item = &'a [char];
+    type Item = String;
     fn next(&mut self) -> Option<Self::Item> {
         self.next_token()
     }

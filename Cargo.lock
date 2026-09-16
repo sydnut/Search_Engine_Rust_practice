@@ -8,6 +8,7 @@ version = "0.1.0"
 dependencies = [
  "common",
  "search-core",
+ "serde_json",
  "tiny_http",
 ]
 

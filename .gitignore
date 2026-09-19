@@ -7,3 +7,4 @@ target/**
 /docs.gl/
 .idea/
 *.json
+performance.txt

@@ -1,8 +1,7 @@
-use crate::calculate::{idf, tf};
+use crate::calculate::search;
 use search_core::TFIndex;
-use std::{error::Error, fs::File, path::PathBuf};
+use std::{error::Error, fs::File, time::Instant};
 use tiny_http::{Header, Method, Request, Response, StatusCode};
-type Lexer<'a> = search_core::lexer::Lexer<'a>;
 
 pub fn serve_request(tf_index: &TFIndex, mut req: Request) -> Result<(), Box<dyn Error>> {
     println!(
@@ -10,6 +9,7 @@ pub fn serve_request(tf_index: &TFIndex, mut req: Request) -> Result<(), Box<dyn
         req.method(),
         req.url()
     );
+    let begin_time = Instant::now();
     match req.method() {
         Method::Get => match req.url() {
             "/" | "/index.html" => {
@@ -35,24 +35,12 @@ pub fn serve_request(tf_index: &TFIndex, mut req: Request) -> Result<(), Box<dyn
                     String::from("CONVERT ERROR")
                 });
                 println!("Search: {body}");
-                let body = body.chars().collect::<Vec<_>>();
-                let tokens: Vec<String> = Lexer::new(&body).collect();
-                // record the rank of each doc's tf-idf score
-                let mut res: Vec<(&PathBuf, f32)> = Vec::with_capacity(tf_index.len());
-                for (path, tf_table) in tf_index {
-                    let mut rank = 0f32;
-                    for token in &tokens {
-                        rank += tf(token, tf_table) * idf(token, tf_index);
-                    }
-                    res.push((path, rank));
-                }
-                res.sort_by(|(_, r1), (_, r2)| r2.partial_cmp(r1).unwrap());
-                //show the top 10
-                for (path, rank) in res.iter().take(10) {
-                    println!("{path} => {rank}", path = path.display());
-                }
-                let _ = req
-                    .respond(Response::from_string("ok"))
+                let paths = search(&body, tf_index);
+                let response_body = serde_json::to_string(&paths)?;
+                let content_type =
+                    Header::from_bytes("Content-Type", "application/json; charset=utf-8")
+                        .expect("Content-Type header should be valid");
+                req.respond(Response::from_string(response_body).with_header(content_type))
                     .unwrap_or_else(|err| {
                         eprintln!("ERROR: {err}");
                     });
@@ -61,6 +49,8 @@ pub fn serve_request(tf_index: &TFIndex, mut req: Request) -> Result<(), Box<dyn
         },
         _ => todo!(),
     }
+    //print the performance of the whole process
+    println!("cost time: {}ms", begin_time.elapsed().as_millis());
     Ok(())
 }
 pub fn serve_static_file(req: Request, file_path: &str) -> Result<(), Box<dyn Error>> {

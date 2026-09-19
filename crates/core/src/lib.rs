@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::fs::{self, File};
+use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
 use xml::reader::{EventReader, XmlEvent};
 pub mod lexer;
@@ -26,7 +27,7 @@ fn check_xml_ext(file_path: impl AsRef<Path>) -> bool {
 /// promise that every file path has been checked before
 fn read_xml_file(file_path: impl AsRef<Path>) -> std::io::Result<String> {
     let file = File::open(file_path)?;
-    let reader = EventReader::new(file);
+    let reader = EventReader::new(BufReader::new(file));
     let mut buffer = String::new();
     for event in reader.into_iter() {
         let event = event.unwrap_or_else(|err| {
@@ -89,7 +90,7 @@ pub fn read_xml_dir_and_write(
     let tmp_path = target_path.as_ref();
     println!("Writing Index to {:?}", tmp_path);
     let target_file = File::create(target_path)?;
-    serde_json::to_writer(target_file, &res)?;
+    serde_json::to_writer(BufWriter::new(target_file), &res)?;
 
     Ok(())
 }

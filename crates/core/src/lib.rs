@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::fs::{self, File};
@@ -7,6 +8,12 @@ use xml::reader::{EventReader, XmlEvent};
 pub mod lexer;
 pub type TF = HashMap<String, usize>;
 pub type TFIndex = HashMap<PathBuf, TF>;
+pub type DF = HashMap<String, usize>;
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct Model {
+    df: DF,
+    tf_index: TFIndex,
+}
 /// return `true` if it can be xml parser parsed
 fn check_xml_ext(file_path: impl AsRef<Path>) -> bool {
     //校验拓展名
@@ -42,7 +49,7 @@ fn read_xml_file(file_path: impl AsRef<Path>) -> std::io::Result<String> {
     Ok(buffer)
 }
 /// tokenize the file content into the `TFIndex`
-fn tokenize_file(dir_path: &impl AsRef<Path>, res: &mut TFIndex) -> std::io::Result<()> {
+fn tokenize_file(dir_path: &impl AsRef<Path>, res: &mut Model) -> std::io::Result<()> {
     let content = read_xml_file(dir_path.as_ref())?
         .chars()
         .collect::<Vec<_>>();
@@ -51,11 +58,20 @@ fn tokenize_file(dir_path: &impl AsRef<Path>, res: &mut TFIndex) -> std::io::Res
         let fre = tf.entry(token).or_insert(0);
         *fre += 1;
     }
-    res.insert(PathBuf::from(dir_path.as_ref()), tf);
+    for term in tf.keys() {
+        let df = res.df_mut();
+        if let Some(fre) = df.get_mut(term) {
+            *fre += 1;
+        } else {
+            df.insert(term.clone(), 1);
+        }
+    }
+    res.tf_index_mut()
+        .insert(PathBuf::from(dir_path.as_ref()), tf);
     Ok(())
 }
 /// this fn will recursively watch all the subfiles and accumulate into `res`
-fn for_each_file(dir_path: impl AsRef<Path>, res: &mut TFIndex) -> std::io::Result<()> {
+fn for_each_file(dir_path: impl AsRef<Path>, res: &mut Model) -> std::io::Result<()> {
     //base case 文件
     if dir_path.as_ref().is_file() {
         let path = dir_path.as_ref();
@@ -79,29 +95,31 @@ fn for_each_file(dir_path: impl AsRef<Path>, res: &mut TFIndex) -> std::io::Resu
     }
     Ok(())
 }
-/// 驱动函数，读取给定文件夹，然后解析输出到对应文件
+/// 驱动函数，读取给定文件夹，然后解析输出到对应文件,写入`Model`
 pub fn read_xml_dir_and_write(
     dir_path: impl AsRef<Path>,
     target_path: impl AsRef<Path>,
 ) -> std::io::Result<()> {
-    let mut res: TFIndex = TFIndex::new();
-    for_each_file(dir_path, &mut res)?;
-
+    let mut data = Model::default();
+    for_each_file(dir_path, &mut data)?;
+    //build the data to be imported
     let tmp_path = target_path.as_ref();
     println!("Writing Index to {:?}", tmp_path);
     let target_file = File::create(target_path)?;
-    serde_json::to_writer(BufWriter::new(target_file), &res)?;
-
+    serde_json::to_writer(BufWriter::new(target_file), &data)?;
     Ok(())
 }
 
 //unused
 #[allow(unused)]
 fn read_xml_dir(dir_path: impl AsRef<Path>) -> std::io::Result<()> {
-    let mut res: TFIndex = TFIndex::new();
+    let mut res = Model::default();
     for_each_file(dir_path, &mut res)?;
-    for (path, tf) in res {
-        println!("{path:?} has {count} uk terms", count = tf.len());
+    for (path, tf) in res.tf_index() {
+        println!(
+            "{path:?} has {count} uk terms",
+            count = res.tf_index().len()
+        );
     }
     Ok(())
 }
@@ -129,5 +147,23 @@ mod tests {
         const FILE_PATH: &str = "../../docs.gl";
         read_xml_dir(FILE_PATH)?;
         Ok(())
+    }
+}
+
+impl Model {
+    pub fn new(df: DF, tf_index: TFIndex) -> Self {
+        Self { df, tf_index }
+    }
+    pub fn tf_index(&self) -> &TFIndex {
+        &self.tf_index
+    }
+    pub fn df(&self) -> &DF {
+        &self.df
+    }
+    pub fn tf_index_mut(&mut self) -> &mut TFIndex {
+        &mut self.tf_index
+    }
+    pub fn df_mut(&mut self) -> &mut DF {
+        &mut self.df
     }
 }

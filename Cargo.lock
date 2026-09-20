@@ -8,6 +8,7 @@ version = "0.1.0"
 dependencies = [
  "common",
  "search-core",
+ "serde",
  "serde_json",
  "tiny_http",
 ]
@@ -74,6 +75,7 @@ dependencies = [
 name = "search-core"
 version = "0.1.0"
 dependencies = [
+ "serde",
  "serde_json",
  "xml-rs",
 ]
@@ -85,6 +87,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4148590afebada386688f18773da617792bf2ef03ffc1e4cbd2b1d45b023e0ba"
 dependencies = [
  "serde_core",
+ "serde_derive",
 ]
 
 [[package]]

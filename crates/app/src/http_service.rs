@@ -1,9 +1,9 @@
 use crate::calculate::search;
-use search_core::TFIndex;
+use search_core::Model;
 use std::{error::Error, fs::File, time::Instant};
 use tiny_http::{Header, Method, Request, Response, StatusCode};
 
-pub fn serve_request(tf_index: &TFIndex, mut req: Request) -> Result<(), Box<dyn Error>> {
+pub fn serve_request(model: &Model, mut req: Request) -> Result<(), Box<dyn Error>> {
     println!(
         "INFO: received request! method: {:?}, url: {:?}",
         req.method(),
@@ -35,7 +35,10 @@ pub fn serve_request(tf_index: &TFIndex, mut req: Request) -> Result<(), Box<dyn
                     String::from("CONVERT ERROR")
                 });
                 println!("Search: {body}");
-                let paths = search(&body, tf_index);
+                let paths = search(&body, model)
+                    .into_iter()
+                    .map(|t| t.0)
+                    .collect::<Vec<_>>();
                 let response_body = serde_json::to_string(&paths)?;
                 let content_type =
                     Header::from_bytes("Content-Type", "application/json; charset=utf-8")

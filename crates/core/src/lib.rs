@@ -125,12 +125,13 @@ fn read_xml_dir(dir_path: impl AsRef<Path>) -> std::io::Result<()> {
 }
 #[cfg(test)]
 mod tests {
+    use crate::lexer::Lexer;
+
     use super::*;
     #[test]
     fn test_lexer() -> std::io::Result<()> {
         let content = read_xml_file("../../docs.gl/gl4/glClear.xhtml")?
             .chars()
-            .map(|c| c.to_ascii_uppercase())
             .collect::<Vec<_>>();
         let lexer = lexer::Lexer::new(&content);
         for token in lexer {
@@ -147,6 +148,14 @@ mod tests {
         const FILE_PATH: &str = "../../docs.gl";
         read_xml_dir(FILE_PATH)?;
         Ok(())
+    }
+    #[test]
+    fn test_stemmer() {
+        let vec = "linear linearly".chars().collect::<Vec<_>>();
+        let lexer = Lexer::new(&vec);
+        for token in lexer {
+            println!("{token}")
+        }
     }
 }
 

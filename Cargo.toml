@@ -1,8 +1,7 @@
 [workspace]
-resolver = "3"
+resolver = "2"
 
 members = [
     "crates/core",
-    "crates/common",
     "crates/app",
 ]

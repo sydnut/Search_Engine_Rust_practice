@@ -6,7 +6,6 @@ version = 4
 name = "app"
 version = "0.1.0"
 dependencies = [
- "common",
  "search-core",
  "serde",
  "serde_json",
@@ -24,10 +23,6 @@ name = "chunked_transfer"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e4de3bc4ea267985becf712dc6d9eed8b04c953b3fcfb339ebc87acd9804901"
-
-[[package]]
-name = "common"
-version = "0.1.0"
 
 [[package]]
 name = "httpdate"
@@ -77,6 +72,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+ "snowstem",
  "xml-rs",
 ]
 
@@ -122,6 +118,12 @@ dependencies = [
  "serde_core",
  "zmij",
 ]
+
+[[package]]
+name = "snowstem"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "163b77ad35037ed96d52a237ff97b3e26c2d74fd66c9d80a46ff6a4eb77f70b0"
 
 [[package]]
 name = "syn"

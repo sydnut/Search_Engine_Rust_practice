@@ -1,11 +1,19 @@
+use snowstem::{Algorithm, Stemmer};
+use std::sync::LazyLock;
+
 #[derive(Debug)]
 pub struct Lexer<'a> {
     content: &'a [char],
+    stemmer: &'static Stemmer,
 }
+static SNOW_STEMMER: LazyLock<Stemmer> = LazyLock::new(|| Stemmer::create(Algorithm::English));
 
 impl<'a> Lexer<'a> {
     pub fn new(content: &'a [char]) -> Self {
-        Self { content }
+        Self {
+            content,
+            stemmer: &SNOW_STEMMER,
+        }
     }
     fn trim_left(&mut self) {
         while self.content.len() > 0 && self.content[0].is_whitespace() {
@@ -24,7 +32,7 @@ impl<'a> Lexer<'a> {
         }
         self._yield(n)
     }
-    pub fn next_token(&mut self) -> Option<String> {
+    fn next_token(&mut self) -> Option<String> {
         self.trim_left();
         if self.content.is_empty() {
             return None;
@@ -33,7 +41,7 @@ impl<'a> Lexer<'a> {
             Some(
                 self._yield_while(|c| c.is_alphanumeric())
                     .iter()
-                    .map(|c| c.to_ascii_uppercase())
+                    .map(|c| c.to_ascii_lowercase())
                     .collect(),
             )
         } else if self.content[0].is_numeric() {
@@ -46,6 +54,13 @@ impl<'a> Lexer<'a> {
 impl<'a> Iterator for Lexer<'a> {
     type Item = String;
     fn next(&mut self) -> Option<Self::Item> {
-        self.next_token()
+        let res = self.next_token();
+        if res.is_none() {
+            None
+        } else {
+            let token = res.unwrap();
+            let cow_str = self.stemmer.stem(&token);
+            Some(cow_str.into_owned())
+        }
     }
 }

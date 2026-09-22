@@ -30,10 +30,11 @@ pub fn serve_request(model: &Model, mut req: Request) -> Result<(), Box<dyn Erro
             "/api/search" => {
                 let mut buf = Vec::new();
                 req.as_reader().read_to_end(&mut buf)?;
-                let body = String::from_utf8(buf).unwrap_or_else(|err| {
+                let body = String::from_utf8(buf).map_err(|err| {
                     eprintln!("ERROR: could not interpret body as UTF-8 string: {err}");
-                    String::from("CONVERT ERROR")
                 });
+                let body = body.unwrap();
+                // TODO empty String should be forbidden
                 println!("Search: {body}");
                 let paths = search(&body, model)
                     .into_iter()
@@ -48,15 +49,18 @@ pub fn serve_request(model: &Model, mut req: Request) -> Result<(), Box<dyn Erro
                         eprintln!("ERROR: {err}");
                     });
             }
-            _ => todo!(),
+            _ => not_support_service(req)?,
         },
-        _ => todo!(),
+        _ => not_support_service(req)?,
     }
     //print the performance of the whole process
-    println!("cost time: {}ms", begin_time.elapsed().as_millis());
+    println!(
+        "search service cost time: {}ms",
+        begin_time.elapsed().as_millis()
+    );
     Ok(())
 }
-pub fn serve_static_file(req: Request, file_path: &str) -> Result<(), Box<dyn Error>> {
+fn serve_static_file(req: Request, file_path: &str) -> Result<(), Box<dyn Error>> {
     let file_suffix = file_path
         .split_at(file_path.find('.').and_then(|i| Some(i + 1)).unwrap_or(0))
         .1;
@@ -71,6 +75,17 @@ pub fn serve_static_file(req: Request, file_path: &str) -> Result<(), Box<dyn Er
         eprintln!("ERROR: failed to respond to response: {}", err);
     });
     Ok(())
+}
+fn not_support_service(req: Request) -> Result<(), Box<dyn Error>> {
+    if let Ok(_) = req.respond(
+        Response::from_string("ERROR: unsupported service").with_status_code(StatusCode::from(404)),
+    ) {
+        println!("INFO: unsupported service");
+        Ok(())
+    } else {
+        eprintln!("ERROR: return status code:404");
+        Ok(())
+    }
 }
 pub fn print_usage_and_error(subcommand: &str) -> Box<dyn Error> {
     println!("Usage: [subcommand] [arg] [options]");

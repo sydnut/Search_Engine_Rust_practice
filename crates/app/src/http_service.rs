@@ -88,15 +88,31 @@ fn not_support_service(req: Request) -> Result<(), Box<dyn Error>> {
     }
 }
 pub fn print_usage_and_error(subcommand: &str) -> Box<dyn Error> {
-    println!("Usage: [subcommand] [arg] [options]");
-    println!(
-        "subcommand `index`: index for the next arg as the input file and the second arg for output file if there is.Default it will output to 'index.json'"
+    //rewrite by GPT-5.6 sol
+    let program = env!("CARGO_PKG_NAME");
+
+    if matches!(subcommand, "index" | "search" | "serve") {
+        eprintln!("error: invalid invocation of command '{subcommand}'");
+    } else {
+        eprintln!("error: unknown command '{subcommand}'");
+    }
+
+    eprintln!(
+        "\
+Usage:
+  {program} index <INPUT_DIR> [OUTPUT_FILE]
+  {program} search <QUERY> <INDEX_FILE>
+  {program} serve <INDEX_FILE> [ADDRESS]
+
+Commands:
+  index   Build an index from XML files in INPUT_DIR
+  search  Search INDEX_FILE and print the top 10 matching paths and scores
+  serve   Start the HTTP search service using INDEX_FILE
+
+Defaults:
+  OUTPUT_FILE  index.json
+  ADDRESS      127.0.0.1:8080"
     );
-    println!("subcommand `search`: search the current directory if it does not exist");
-    println!(
-        "subcommand `serve <index-file> <address>`: init the http server for net,you can add the index file and add a optional[arg] for the address"
-    );
-    println!();
-    eprintln!("ERROR: unknown subcommand: {subcommand}");
-    std::process::exit(1);
+
+    std::process::exit(2);
 }

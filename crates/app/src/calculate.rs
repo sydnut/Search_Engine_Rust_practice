@@ -24,8 +24,9 @@ pub fn search(data: &str, model: &Model) -> Vec<(String, f32)> {
     let tokens: Vec<String> = Lexer::new(&data).collect();
     // record the rank of each doc's tf-idf score
     let mut res: Vec<(&PathBuf, f32)> = Vec::with_capacity(tf_index.len());
-    for (path, tf_table) in tf_index {
+    for (path, doc) in tf_index {
         let mut rank = 0f32;
+        let tf_table = doc.get_tf();
         let sum_term_count: usize = tf_table.iter().map(|(_, f)| *f).sum();
         for token in &tokens {
             rank += tf(token, tf_table, sum_term_count) * idf(token, model);

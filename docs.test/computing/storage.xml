@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document topic="storage">
+  <title>Persistent storage for an index</title>
+  <body>The service loads a saved index, checks document timestamps, and writes updated storage after indexing finishes.</body>
+  <keywords>storage index timestamps</keywords>
+</document>

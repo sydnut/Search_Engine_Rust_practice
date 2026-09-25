@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document topic="rust attribute-only-decoy">
+  <title>Safe systems with Rust</title>
+  <body>Rust ownership prevents many memory errors. A shared index can serve search requests while another thread adds documents.</body>
+  <keywords>rust ownership systems</keywords>
+</document>

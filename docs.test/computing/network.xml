@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document topic="network">
+  <title>Network service under load</title>
+  <body>A network server accepts search requests while workers process a queue. Shared state needs a clear synchronization rule.</body>
+  <keywords>network server workers synchronization</keywords>
+</document>

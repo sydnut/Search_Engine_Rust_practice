@@ -1,5 +1,6 @@
-use std::fs::{self,File};
+use std::collections::HashSet;
 use std::error::Error;
+use std::fs::{self, File};
 use std::io::{BufWriter, ErrorKind};
 use std::ops::Deref;
 use std::path::Path;
@@ -23,52 +24,56 @@ pub fn read_xml_dir_and_write(
     serde_json::to_writer(BufWriter::new(target_file), &data)?;
     Ok(())
 }
-/// re_index the updated index files
+/// re_index the updated index files,
+/// return the operations model need to execute
 // 返回待修改的批处理操作，不需反复使用读写锁
-pub fn re_index(model:&Model) -> Result<Bulk<Update>,Box<dyn Error>>{
+pub fn re_index(model: &Model) -> Result<Bulk<Update>, Box<dyn Error>> {
     // 寻找修改后的文件time，寻找差异diff->diff(tf)，由tf的不同修改DF
     // 返回待批处理对象
     let index = model.index();
-    let mut new_model=Model::default();
+    let mut new_model = Model::default();
+    let mut unmodified = HashSet::new();
     //TODO 暂未新增文件
-    for (path,doc) in index{
-        let path=path.deref();
-        let meta_res = fs::metadata(path);        
-        if meta_res.as_ref().is_err_and(|err|{
-            err.kind()==ErrorKind::NotFound
-        }){
-            eprintln!("DEBUG: {} has been removed",path.display());
+    for (path, doc) in index {
+        let path = path.deref();
+        let meta_res = fs::metadata(path);
+        if meta_res
+            .as_ref()
+            .is_err_and(|err| err.kind() == ErrorKind::NotFound)
+        {
+            eprintln!("DEBUG: {} has been removed", path.display());
             //removed file
             continue;
         }
         let sys_ts = meta_res?.modified()?;
         //1 unmodified
-        if sys_ts == doc.get_ts(){
+        if sys_ts == doc.get_ts() {
+            unmodified.insert(path);
             continue;
         }
         //2 mark diff
-        tokenize_file(&path,&mut new_model,Some(sys_ts))?;
+        tokenize_file(&path, &mut new_model, Some(sys_ts))?;
     }
-    if new_model.is_empty(){
+    if new_model.is_empty() && /*如果没有删除的*/unmodified.len()==index.len() {
         return Ok(Bulk::new());
     }
     //cal diff
-    let mut bulk=Bulk::new();
-    let new_index=new_model.index();
-    //new_index 是 index 的子集        
-    for (path,doc) in index{
+    let mut bulk = Bulk::new();
+    let new_index = new_model.index();
+    //new_index 是 index 的子集
+    for (path, doc) in index {
         //记录删除的文件的缺失数据，已经修改文件的改动（词的新增、修改、删除）对DF缓存的数据同步
-        if let Some(new_doc)=new_index.get(path){
-            bulk.extend(new_doc.diff(doc,path.clone()));
-        }else{
+        if let Some(new_doc) = new_index.get(path) {
+            bulk.extend(new_doc.diff(doc, path.clone()));
+        } else if !unmodified.contains(path.deref()) {
             //删除了文件
             //1 sync df cache
-            for (term,_) in doc.get_tf(){
+            for (term, _) in doc.get_tf() {
                 //update: df[term]-=1
-                bulk.push(Update::modify(Modified::DF,term.clone(), -1));
-            } 
+                bulk.push(Update::modify(Modified::DF, term.clone(), -1));
+            }
             //2 remove this file in new index
-            //update: remove path 
+            //update: remove path
             bulk.push(Update::remove(path.clone()));
         }
     }
@@ -86,13 +91,11 @@ mod tests {
         }
     }
     #[test]
-    fn test_dismissing_error_kind(){
-        let path=std::path::Path::new("abc");
-        let meta_res = std::fs::metadata(path);        
-        if meta_res.is_err_and(|err|{
-            err.kind()==std::io::ErrorKind::NotFound
-        }){
-            eprintln!("DEBUG: {} has been removed",path.display());
+    fn test_dismissing_error_kind() {
+        let path = std::path::Path::new("abc");
+        let meta_res = std::fs::metadata(path);
+        if meta_res.is_err_and(|err| err.kind() == std::io::ErrorKind::NotFound) {
+            eprintln!("DEBUG: {} has been removed", path.display());
         };
     }
 }

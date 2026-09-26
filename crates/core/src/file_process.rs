@@ -94,7 +94,7 @@ pub fn for_each_file(dir_path: impl AsRef<Path>, res: &mut Model) -> std::io::Re
     if dir_path.as_ref().is_file() {
         let path = dir_path.as_ref();
         if check_xml_ext(path) {
-            tokenize_file(&path, res,None)?;
+            tokenize_file(&path, res, None)?;
         }
         return Ok(());
     }
@@ -107,7 +107,7 @@ pub fn for_each_file(dir_path: impl AsRef<Path>, res: &mut Model) -> std::io::Re
             for_each_file(path.clone(), res)?;
         } else {
             if check_xml_ext(path.clone()) {
-                tokenize_file(&path, res,None)?;
+                tokenize_file(&path, res, None)?;
             }
         }
     }
@@ -120,10 +120,7 @@ fn read_xml_dir(dir_path: impl AsRef<Path>) -> std::io::Result<()> {
     let mut res = Model::new(DF::default(), Index::default());
     for_each_file(dir_path, &mut res)?;
     for (path, tf) in res.index() {
-        println!(
-            "{path:?} has {count} uk terms",
-            count = res.index().len()
-        );
+        println!("{path:?} has {count} uk terms", count = res.index().len());
     }
     Ok(())
 }

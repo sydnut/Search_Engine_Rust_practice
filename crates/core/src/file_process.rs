@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use xml::reader::{EventReader, XmlEvent};
 /// read the last modified time of the file path
-fn read_systime_from_path(file_path: impl AsRef<Path>) -> std::io::Result<SystemTime> {
+pub(crate) fn read_systime_from_path(file_path: impl AsRef<Path>) -> std::io::Result<SystemTime> {
     let meta_data = fs::metadata(file_path.as_ref()).map_err(|err| {
         eprintln!(
             "ERROR: can not read the metadata of {file_path},{err}",
@@ -24,7 +24,7 @@ fn read_systime_from_path(file_path: impl AsRef<Path>) -> std::io::Result<System
     })
 }
 /// return `true` if it can be xml parser parsed
-fn check_xml_ext(file_path: impl AsRef<Path>) -> bool {
+pub(crate) fn check_xml_ext(file_path: impl AsRef<Path>) -> bool {
     //校验拓展名
     match file_path.as_ref().extension().and_then(OsStr::to_str) {
         None => false,
@@ -41,7 +41,7 @@ fn check_xml_ext(file_path: impl AsRef<Path>) -> bool {
 /// read the path of xml path and convert its `string` into the str split by space `"\ "`
 /// ___
 /// promise that every file path has been checked before
-fn convert_xml_file(file_path: impl AsRef<Path>) -> std::io::Result<String> {
+pub(crate) fn convert_xml_file(file_path: impl AsRef<Path>) -> std::io::Result<String> {
     let file = File::open(file_path)?;
     let reader = EventReader::new(BufReader::new(file));
     let mut buffer = String::new();
@@ -58,7 +58,11 @@ fn convert_xml_file(file_path: impl AsRef<Path>) -> std::io::Result<String> {
     Ok(buffer)
 }
 /// tokenize the file content into the `Index`
-fn tokenize_file(dir_path: &impl AsRef<Path>, res: &mut Model) -> std::io::Result<()> {
+pub(crate) fn tokenize_file(
+    dir_path: &impl AsRef<Path>,
+    res: &mut Model,
+    sys_ts: Option<SystemTime>,
+) -> std::io::Result<()> {
     let content = convert_xml_file(dir_path.as_ref())?
         .chars()
         .collect::<Vec<_>>();
@@ -75,8 +79,12 @@ fn tokenize_file(dir_path: &impl AsRef<Path>, res: &mut Model) -> std::io::Resul
             df.insert(term.clone(), 1);
         }
     }
-    let sys_ts = read_systime_from_path(dir_path)?;
-    res.tf_index_mut()
+    let sys_ts = if sys_ts.is_none() {
+        read_systime_from_path(dir_path)?
+    } else {
+        sys_ts.unwrap()
+    };
+    res.index_mut()
         .insert(PathBuf::from(dir_path.as_ref()), Doc::new(tf, sys_ts));
     Ok(())
 }
@@ -86,7 +94,7 @@ pub fn for_each_file(dir_path: impl AsRef<Path>, res: &mut Model) -> std::io::Re
     if dir_path.as_ref().is_file() {
         let path = dir_path.as_ref();
         if check_xml_ext(path) {
-            tokenize_file(&path, res)?;
+            tokenize_file(&path, res,None)?;
         }
         return Ok(());
     }
@@ -99,7 +107,7 @@ pub fn for_each_file(dir_path: impl AsRef<Path>, res: &mut Model) -> std::io::Re
             for_each_file(path.clone(), res)?;
         } else {
             if check_xml_ext(path.clone()) {
-                tokenize_file(&path, res)?;
+                tokenize_file(&path, res,None)?;
             }
         }
     }
@@ -111,10 +119,10 @@ pub fn for_each_file(dir_path: impl AsRef<Path>, res: &mut Model) -> std::io::Re
 fn read_xml_dir(dir_path: impl AsRef<Path>) -> std::io::Result<()> {
     let mut res = Model::new(DF::default(), Index::default());
     for_each_file(dir_path, &mut res)?;
-    for (path, tf) in res.tf_index() {
+    for (path, tf) in res.index() {
         println!(
             "{path:?} has {count} uk terms",
-            count = res.tf_index().len()
+            count = res.index().len()
         );
     }
     Ok(())

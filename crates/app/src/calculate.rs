@@ -13,13 +13,13 @@ fn tf(term: &str, doc: &TF, sum_term_count: usize) -> f32 {
 /// n means the total number of docs,count means the count of the docs
 /// where the term occurs in
 fn idf(term: &str, model: &Model) -> f32 {
-    let n: usize = model.tf_index().len();
+    let n: usize = model.index().len();
     let count = (*model.df().get(term).unwrap_or(&0)).max(1);
     f32::log10(n as f32 / count as f32).abs()
 }
 /// core search function,apply the index to the input data so you can the get the top 10 path
 pub fn search(data: &str, model: &Model) -> Vec<(String, f32)> {
-    let tf_index = model.tf_index();
+    let tf_index = model.index();
     let data = data.chars().collect::<Vec<_>>();
     let tokens: Vec<String> = Lexer::new(&data).collect();
     // record the rank of each doc's tf-idf score

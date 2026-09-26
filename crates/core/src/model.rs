@@ -290,7 +290,7 @@ mod tests {
             ),
         ]);
 
-        let bulk = crate::re_index(&model).unwrap();
+        let bulk = crate::re_index(&model).unwrap().unwrap();
         model.apply(bulk);
 
         assert_eq!(model.index().len(), 2);
@@ -303,7 +303,7 @@ mod tests {
         assert_eq!(model.index()[&unchanged].get_tf(), &tf(&[("rust", 1)]));
         assert_eq!(model.index()[&unchanged].get_ts(), unchanged_ts);
         assert_eq!(model.df(), &tf(&[("rust", 2), ("fresh", 1)]));
-        assert!(crate::re_index(&model).unwrap().is_empty());
+        assert!(crate::re_index(&model).unwrap().is_none());
     }
 
     #[test]
@@ -315,7 +315,7 @@ mod tests {
             (unchanged.clone(), Doc::new(tf(&[("rust", 1)]), ts)),
             (deleted, Doc::new(tf(&[("rust", 2), ("lost", 1)]), ts)),
         ]);
-        let bulk = crate::re_index(&model).unwrap();
+        let bulk = crate::re_index(&model).unwrap().unwrap();
         model.apply(bulk);
 
         assert_eq!(model.index().len(), 1);
@@ -323,7 +323,7 @@ mod tests {
         assert_eq!(model.df(), &tf(&[("rust", 1)]));
 
         fs::remove_file(&unchanged).unwrap();
-        let bulk = crate::re_index(&model).unwrap();
+        let bulk = crate::re_index(&model).unwrap().unwrap();
         model.apply(bulk);
         assert!(model.is_empty());
     }
@@ -336,7 +336,7 @@ mod tests {
             path.clone(),
             Doc::new(tf(&[("rust", 2)]), ts - Duration::from_secs(1)),
         )]);
-        let bulk = crate::re_index(&model).unwrap();
+        let bulk = crate::re_index(&model).unwrap().unwrap();
         model.apply(bulk);
 
         assert_eq!(model.index()[&path].get_tf(), &tf(&[("rust", 2)]));

@@ -3,7 +3,10 @@ use search_core::Model;
 use std::{error::Error, fs::File, time::Instant};
 use tiny_http::{Header, Method, Request, Response, StatusCode};
 
-pub fn serve_request(model: &Model, mut req: Request) -> Result<(), Box<dyn Error>> {
+pub fn serve_request(
+    model: std::sync::Arc<std::sync::RwLock<Model>>,
+    mut req: Request,
+) -> Result<(), Box<dyn Error>> {
     println!(
         "INFO: received request! method: {:?}, url: {:?}",
         req.method(),
@@ -36,10 +39,17 @@ pub fn serve_request(model: &Model, mut req: Request) -> Result<(), Box<dyn Erro
                 let body = body.unwrap();
                 // TODO empty String should be forbidden
                 println!("Search: {body}");
-                let paths = search(&body, model)
+                let model = model
+                    .read()
+                    .map_err(|err| {
+                        eprintln!("ERROR: try to acquire the read lock failed,err={err}")
+                    })
+                    .unwrap();
+                let paths = search(&body, &model)
                     .into_iter()
                     .map(|t| t.0)
                     .collect::<Vec<_>>();
+                drop(model);
                 let response_body = serde_json::to_string(&paths)?;
                 let content_type =
                     Header::from_bytes("Content-Type", "application/json; charset=utf-8")

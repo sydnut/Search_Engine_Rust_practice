@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<manual>
-  <title>Search index operator manual</title>
-  <section><heading>Starting the service</heading><p>Load the index, start the background worker, and keep the search endpoint available.</p></section>
-  <section><heading>Updating documents</heading><p>Compare timestamps, replace changed document terms, and update the shared index statistics.</p></section>
-</manual>

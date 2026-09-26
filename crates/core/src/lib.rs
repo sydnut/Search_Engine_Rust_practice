@@ -24,10 +24,19 @@ pub fn read_xml_dir_and_write(
     serde_json::to_writer(BufWriter::new(target_file), &data)?;
     Ok(())
 }
+pub fn write_to_disk(model: &Model, target_path: impl AsRef<Path>) -> std::io::Result<()> {
+    let tmp_path = target_path.as_ref();
+    println!("Writing Index to {:?}", tmp_path);
+    let target_file = File::create(target_path)?;
+    serde_json::to_writer(BufWriter::new(target_file), model)?;
+    println!("Writing Index finished");
+    Ok(())
+}
 /// re_index the updated index files,
 /// return the operations model need to execute
 // 返回待修改的批处理操作，不需反复使用读写锁
-pub fn re_index(model: &Model) -> Result<Bulk<Update>, Box<dyn Error>> {
+pub fn re_index(model: &Model) -> Result<Option<Bulk<Update>>, Box<dyn Error>> {
+    let begin_time = std::time::Instant::now();
     // 寻找修改后的文件time，寻找差异diff->diff(tf)，由tf的不同修改DF
     // 返回待批处理对象
     let index = model.index();
@@ -55,7 +64,7 @@ pub fn re_index(model: &Model) -> Result<Bulk<Update>, Box<dyn Error>> {
         tokenize_file(&path, &mut new_model, Some(sys_ts))?;
     }
     if new_model.is_empty() && /*如果没有删除的*/unmodified.len()==index.len() {
-        return Ok(Bulk::new());
+        return Ok(None);
     }
     //cal diff
     let mut bulk = Bulk::new();
@@ -77,7 +86,11 @@ pub fn re_index(model: &Model) -> Result<Bulk<Update>, Box<dyn Error>> {
             bulk.push(Update::remove(path.clone()));
         }
     }
-    Ok(bulk)
+    println!(
+        "DEBUG: re_index cost:[{}] ms",
+        begin_time.elapsed().as_millis()
+    );
+    Ok(Some(bulk))
 }
 #[cfg(test)]
 mod tests {

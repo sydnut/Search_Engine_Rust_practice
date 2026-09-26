@@ -57,7 +57,8 @@ pub(crate) fn convert_xml_file(file_path: impl AsRef<Path>) -> std::io::Result<S
     }
     Ok(buffer)
 }
-/// tokenize the file content into the `Index`
+/// tokenize the file content and put it in the `Index`
+/// > sys_ts will call an sys_call to get itself when it is `None`
 pub(crate) fn tokenize_file(
     dir_path: &impl AsRef<Path>,
     res: &mut Model,
@@ -114,45 +115,37 @@ pub fn for_each_file(dir_path: impl AsRef<Path>, res: &mut Model) -> std::io::Re
     Ok(())
 }
 
-//unused
-#[allow(unused)]
-fn read_xml_dir(dir_path: impl AsRef<Path>) -> std::io::Result<()> {
-    let mut res = Model::new(DF::default(), Index::default());
-    for_each_file(dir_path, &mut res)?;
-    for (path, tf) in res.index() {
-        println!("{path:?} has {count} uk terms", count = res.index().len());
-    }
-    Ok(())
-}
-#[cfg(test)]
 mod tests {
-    use super::*;
     #[test]
     fn test_read_meta_data() -> std::io::Result<()> {
         let path = "test_meta_data_file.txt";
-        let _ = fs::write(path, "ferris🦀")?;
-        println!("the last modified time:{:?}", read_systime_from_path(path)?);
-        fs::remove_file(path)
+        let _ = std::fs::write(path, "ferris🦀")?;
+        println!(
+            "the last modified time:{:?}",
+            super::read_systime_from_path(path)?
+        );
+        std::fs::remove_file(path)
     }
     #[test]
     fn test_lexer() -> std::io::Result<()> {
-        let content = convert_xml_file("../../docs.gl/gl4/glClear.xhtml")?
+        let content = super::convert_xml_file("../../docs.gl/gl4/glClear.xhtml")?
             .chars()
             .collect::<Vec<_>>();
-        let lexer = lexer::Lexer::new(&content);
+        let lexer = super::lexer::Lexer::new(&content);
         for token in lexer {
             println!("{token}");
         }
         Ok(())
     }
     #[test]
-    fn test_fre() -> std::io::Result<()> {
-        read_xml_dir("../../docs.gl/gl4")
-    }
-    #[test]
-    fn it_works() -> std::io::Result<()> {
-        const FILE_PATH: &str = "../../docs.gl";
-        read_xml_dir(FILE_PATH)?;
-        Ok(())
+    fn test_walk_dir() {
+        for entry in walkdir::WalkDir::new("../") {
+            let entry = entry.unwrap();
+            println!("{}", entry.path().display())
+        }
+        assert_eq!(
+            std::path::Path::new(".\\src"),
+            std::path::Path::new("./src")
+        )
     }
 }

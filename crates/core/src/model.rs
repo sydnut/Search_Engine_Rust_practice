@@ -9,6 +9,7 @@ pub type Index = HashMap<PathBuf, Doc>;
 pub type DF = HashMap<String, usize>;
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Model {
+    source: String,
     df: DF,
     index: Index,
 }
@@ -30,14 +31,22 @@ pub enum Update {
     //remove path
     Remove(std::path::PathBuf),
     Set(std::path::PathBuf, std::time::SystemTime),
+    Merge(Box<Model>),
 }
 pub enum Modified {
     DF,
     TF(std::path::PathBuf),
 }
 impl Model {
-    pub fn new(df: DF, index: Index) -> Self {
-        Self { df, index }
+    pub fn new(source: String, df: DF, index: Index) -> Self {
+        Self { source, df, index }
+    }
+    pub fn source(&self) -> String {
+        self.source.clone()
+    }
+    pub fn with_source(&mut self, source: String) -> &mut Self {
+        self.source = source;
+        self
     }
     pub fn index(&self) -> &Index {
         &self.index
@@ -58,6 +67,11 @@ impl Model {
         bulk.into_iter().for_each(|cmd| cmd.exec(self));
     }
 }
+impl Into<Index> for Model {
+    fn into(self) -> Index {
+        self.index
+    }
+}
 impl Update {
     pub fn modify(t: Modified, term: String, cnt: isize) -> Self {
         Self::Modify { t, term, cnt }
@@ -67,6 +81,9 @@ impl Update {
     }
     pub fn set(path: std::path::PathBuf, ts: std::time::SystemTime) -> Self {
         Self::Set(path, ts)
+    }
+    pub fn merge(new: Box<Model>) -> Self {
+        Self::Merge(new)
     }
     /// call one Update executed on the model
     pub(self) fn exec(self, model: &mut Model) {
@@ -96,6 +113,19 @@ impl Update {
                     .index_mut()
                     .entry(path)
                     .and_modify(|doc| doc.set_ts(ts));
+            }
+            Self::Merge(new_model) => {
+                let df = model.df_mut();
+                // 更新df缓存
+                for (term, cnt) in new_model.df() {
+                    df.entry(term.clone())
+                        .and_modify(|old_cnt| *old_cnt += cnt)
+                        .or_insert(*cnt);
+                }
+                let index = model.index_mut();
+                for (path, tf) in Into::<Index>::into(*new_model) {
+                    index.insert(path, tf);
+                }
             }
         }
     }
@@ -182,7 +212,7 @@ mod tests {
                 *df.entry(term.clone()).or_insert(0) += 1;
             }
         }
-        Model::new(df, docs.into_iter().collect())
+        Model::new("test".into(), df, docs.into_iter().collect())
     }
 
     #[test]
@@ -289,6 +319,7 @@ mod tests {
                 Doc::new(tf(&[("rust", 2), ("lost", 1)]), ts),
             ),
         ]);
+        model.with_source(fixture.0.to_string_lossy().into_owned());
 
         let bulk = crate::re_index(&model).unwrap().unwrap();
         model.apply(bulk);
@@ -315,6 +346,7 @@ mod tests {
             (unchanged.clone(), Doc::new(tf(&[("rust", 1)]), ts)),
             (deleted, Doc::new(tf(&[("rust", 2), ("lost", 1)]), ts)),
         ]);
+        model.with_source(fixture.0.to_string_lossy().into_owned());
         let bulk = crate::re_index(&model).unwrap().unwrap();
         model.apply(bulk);
 
@@ -336,11 +368,51 @@ mod tests {
             path.clone(),
             Doc::new(tf(&[("rust", 2)]), ts - Duration::from_secs(1)),
         )]);
+        model.with_source(fixture.0.to_string_lossy().into_owned());
         let bulk = crate::re_index(&model).unwrap().unwrap();
         model.apply(bulk);
 
         assert_eq!(model.index()[&path].get_tf(), &tf(&[("rust", 2)]));
         assert_eq!(model.df(), &tf(&[("rust", 1)]));
         assert_eq!(model.index()[&path].get_ts(), ts);
+    }
+
+    #[test]
+    fn reindex_adds_nested_xml_and_ignores_non_xml_files() {
+        let fixture = Fixture::new();
+        let (existing, ts) = fixture.write("existing.xml", "<doc>rust old</doc>");
+        let mut model = model_with_docs(vec![(
+            existing.clone(),
+            Doc::new(tf(&[("rust", 1), ("old", 1)]), ts),
+        )]);
+        model.with_source(fixture.0.to_string_lossy().into_owned());
+
+        assert!(crate::re_index(&model).unwrap().is_none());
+        fixture.write("first.xml", "<doc>rust fresh fresh</doc>");
+        fs::create_dir(fixture.0.join("nested")).unwrap();
+        fixture.write("nested/second.xhtml", "<doc>fresh other</doc>");
+        fixture.write("README.md", "This is not XML.");
+
+        let bulk = crate::re_index(&model).unwrap().unwrap();
+        model.apply(bulk);
+
+        assert_eq!(model.index().len(), 3);
+        assert_eq!(
+            model.index()[&existing].get_tf(),
+            &tf(&[("rust", 1), ("old", 1)])
+        );
+        assert_eq!(
+            model.index()[&fixture.0.join("first.xml")].get_tf(),
+            &tf(&[("rust", 1), ("fresh", 2)])
+        );
+        assert_eq!(
+            model.index()[&fixture.0.join("nested/second.xhtml")].get_tf(),
+            &tf(&[("fresh", 1), ("other", 1)])
+        );
+        assert_eq!(
+            model.df(),
+            &tf(&[("rust", 2), ("old", 1), ("fresh", 2), ("other", 1)])
+        );
+        assert!(crate::re_index(&model).unwrap().is_none());
     }
 }

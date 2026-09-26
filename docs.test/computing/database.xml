@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <document topic="database">
-  <title>Database transactions and records</title>
-  <body>A database transaction updates records. Each transaction writes a log, and a shared database stores records.</body>
-  <keywords>database transaction records</keywords>
+  <title>Database indexes and queries</title>
+  <body>A database index speeds queries over records. The index maps terms to documents, and a shared database stores updates.</body>
+  <keywords>database index queries</keywords>
 </document>

@@ -9,13 +9,15 @@ pub mod lexer;
 pub mod model;
 pub use model::*;
 
-use crate::file_process::tokenize_file;
+use crate::file_process::{check_xml_ext, tokenize_file};
 /// 驱动函数，读取给定文件夹，然后解析输出到对应文件,写入`Model`
 pub fn read_xml_dir_and_write(
     dir_path: impl AsRef<Path>,
     target_path: impl AsRef<Path>,
 ) -> std::io::Result<()> {
     let mut data = Model::default();
+    // set source
+    data.with_source(dir_path.as_ref().to_string_lossy().into_owned());
     file_process::for_each_file(dir_path, &mut data)?;
     //build the data to be imported
     let tmp_path = target_path.as_ref();
@@ -42,7 +44,7 @@ pub fn re_index(model: &Model) -> Result<Option<Bulk<Update>>, Box<dyn Error>> {
     let index = model.index();
     let mut new_model = Model::default();
     let mut unmodified = HashSet::new();
-    //TODO 暂未新增文件
+    // 记录修改过的文件和删除了的文件
     for (path, doc) in index {
         let path = path.deref();
         let meta_res = fs::metadata(path);
@@ -63,13 +65,26 @@ pub fn re_index(model: &Model) -> Result<Option<Bulk<Update>>, Box<dyn Error>> {
         //2 mark diff
         tokenize_file(&path, &mut new_model, Some(sys_ts))?;
     }
-    if new_model.is_empty() && /*如果没有删除的*/unmodified.len()==index.len() {
+    // 遍历原目录的所有子文件，比对是否存在新的文件
+    let mut new_files = Vec::new();
+    for entry in walkdir::WalkDir::new(model.source()) {
+        let entry = entry?;
+        if entry.file_type().is_file()
+            && check_xml_ext(entry.path())
+            && !index.contains_key(entry.path())
+        {
+            new_files.push(entry.path().display().to_string());
+        }
+    }
+    if new_model.is_empty() && /*如果没有删除的*/unmodified.len()==index.len()
+    && /*没有新增的*/new_files.is_empty()
+    {
         return Ok(None);
     }
     //cal diff
     let mut bulk = Bulk::new();
     let new_index = new_model.index();
-    //new_index 是 index 的子集
+    // 先处理index比new_index多的和公共的
     for (path, doc) in index {
         //记录删除的文件的缺失数据，已经修改文件的改动（词的新增、修改、删除）对DF缓存的数据同步
         if let Some(new_doc) = new_index.get(path) {
@@ -86,6 +101,14 @@ pub fn re_index(model: &Model) -> Result<Option<Bulk<Update>>, Box<dyn Error>> {
             bulk.push(Update::remove(path.clone()));
         }
     }
+    // 设置新增的
+    // box降低内存复制花费
+    let mut new_model = Box::new(Model::default());
+    for path_str in new_files {
+        let path = Path::new(&path_str);
+        tokenize_file(&path, &mut new_model, None)?;
+    }
+    bulk.push(Update::merge(new_model));
     println!(
         "DEBUG: re_index cost:[{}] ms",
         begin_time.elapsed().as_millis()

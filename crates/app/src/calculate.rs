@@ -36,6 +36,7 @@ pub fn search(data: &str, model: &Model) -> Vec<(String, f32)> {
     res.sort_by(|(_, r1), (_, r2)| r2.partial_cmp(r1).unwrap());
     // Return the paths of the top 10 results as JSON.
     res.iter()
+        .filter(|(_, score)| *score > 0f32)
         .take(10)
         .map(|(path, score)| (path.display().to_string().replace("\\", "/"), *score))
         .collect::<Vec<_>>()

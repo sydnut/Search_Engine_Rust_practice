@@ -1,12 +1,12 @@
 # Search Engine in Rust
 
-一个用 Rust 编写的轻量级全文搜索引擎练习项目。它能够递归索引 XML 文档，并通过命令行、网页或 HTTP API 返回相关度最高的 10 个文件。
+一个用 Rust 编写的轻量级全文搜索引擎练习项目。它能够递归索引 XML、XHTML 和 PDF 文档，并通过命令行、网页或 HTTP API 返回相关度最高的 10 个文件。
 
-> 项目仍在开发中，接口和索引格式可能继续调整。
+> 当前阶段的功能已完成，项目暂告一段落。未来如果继续学习过程宏，可能会用它简化 `FileHandler` 的注册。
 
 ## 已实现功能
 
-- 递归扫描目录并解析 `.xml` 文档
+- 递归扫描目录并解析 `.xml`、`.xhtml` 和 `.pdf` 文档
 - 对英文词元进行小写归一化，并使用 `snowstem` 的 English Snowball stemmer 提取词干
 - 统计 TF 与 DF，将索引模型和源目录信息保存为 JSON
 - 使用 TF-IDF 计算相关度，返回 Top 10 文件路径及分数
@@ -54,12 +54,10 @@ crates/
 └── core/      # 文件处理器、分词、词干提取、索引构建与增量更新
 ```
 
-## 后续计划
-
-- 增加更多文件格式与停用词过滤
-- 改进相关度计算、错误处理和 Web 界面
-- 完善测试与索引同步流程
-
 ## 学习来源
 
-本项目跟随 [Tsoding 的 Search Engine in Rust 视频系列](https://www.youtube.com/watch?v=hm5xOJiVEeg&list=PLpM-Dvs8t0VZXC-91PpIp-eAt0WF5SKEv) 学习并编写，并在此基础上加入了 CLI 参数、递归目录索引、英文词干提取、Web 搜索、增量索引和可扩展文件处理接口。
+本项目跟随 [Tsoding 的 Search Engine in Rust 视频系列](https://www.youtube.com/watch?v=hm5xOJiVEeg&list=PLpM-Dvs8t0VZXC-91PpIp-eAt0WF5SKEv) 学习并编写，并在此基础上加入了 CLI 参数、递归目录索引、英文词干提取、Web 搜索、增量索引和支持 XML、XHTML、PDF 的文件处理接口。
+
+## 许可证
+
+本项目采用 [MIT 许可证](LICENSE)。

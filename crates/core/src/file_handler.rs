@@ -4,7 +4,9 @@ use std::fs;
 use std::io::Result;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
+mod pdf_handler;
 mod xml_handler;
+pub(crate) use pdf_handler::PdfFileHandler;
 pub(crate) use xml_handler::XmlFileHandler;
 
 pub trait FileHandler: Send {

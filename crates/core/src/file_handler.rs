@@ -8,38 +8,27 @@ mod xml_handler;
 pub(crate) use xml_handler::XmlFileHandler;
 
 pub trait FileHandler: Send {
-    fn validate(&self, file_path: &Path) -> bool;
-    fn convert_content_to_string_spilt_by_space(&mut self, file_path: &Path) -> Result<String>;
+    fn extract_text(&self, file_path: &Path) -> Result<String>;
 }
 pub type Handlers = HashMap<String, Box<dyn FileHandler>>;
-#[allow(dead_code)]
-pub(crate) enum SupportedType {
-    Xml,
-    Txt,
+/// get the handler of file's type,return none if ext is unvalid or there
+/// is no optional handler
+pub fn get_handler<'a>(handlers: &'a Handlers, path: &Path) -> Option<&'a dyn FileHandler> {
+    let ext = path.extension()?.to_str()?;
+    handlers.get(ext).map(Box::as_ref)
 }
-impl SupportedType {
-    pub fn get_handler<'a>(
-        handlers: &'a mut Handlers,
-        path: &Path,
-    ) -> Option<&'a mut Box<dyn FileHandler>> {
-        let ext = path.extension();
-        if ext.is_none() {
-            return None;
-        }
-        let ext = ext.unwrap().to_string_lossy().into_owned();
-        handlers.get_mut(&ext)
-    }
-}
+/// walk the root dir and handle all the files using the file hander
+/// of its ext name
 pub fn walk_and_process(
-    handlers: &mut Handlers,
+    handlers: &Handlers,
     dir_path: impl AsRef<Path>,
     res: &mut Model,
 ) -> std::io::Result<()> {
     //base case 文件
     if dir_path.as_ref().is_file() {
         let path = dir_path.as_ref();
-        if let Some(handler) = SupportedType::get_handler(handlers, path) {
-            tokenize(handler.as_mut(), &path, res, None)?;
+        if let Some(handler) = get_handler(handlers, path) {
+            tokenize(handler, &path, res, None)?;
         } else {
             println!("WARN: Unsupported file:{}", path.display())
         }
@@ -53,8 +42,8 @@ pub fn walk_and_process(
         if path.is_dir() {
             walk_and_process(handlers, path.clone(), res)?;
         } else {
-            if let Some(handler) = SupportedType::get_handler(handlers, path.as_path()) {
-                tokenize(handler.as_mut(), &path, res, None)?;
+            if let Some(handler) = get_handler(handlers, path.as_path()) {
+                tokenize(handler, &path, res, None)?;
             } else {
                 println!("WARN: Unsupported file:{}", path.display())
             }
@@ -65,13 +54,13 @@ pub fn walk_and_process(
 /// tokenize the file content and put it in the `Index`
 /// > sys_ts will call an sys_call to get itself when it is `None`
 pub fn tokenize(
-    handler: &mut dyn FileHandler,
+    handler: &dyn FileHandler,
     dir_path: &impl AsRef<Path>,
     res: &mut Model,
     sys_ts: Option<SystemTime>,
 ) -> std::io::Result<()> {
     let content = handler
-        .convert_content_to_string_spilt_by_space(dir_path.as_ref())?
+        .extract_text(dir_path.as_ref())?
         .chars()
         .collect::<Vec<_>>();
     let mut tf: TF = TF::new();
@@ -96,6 +85,7 @@ pub fn tokenize(
         .insert(PathBuf::from(dir_path.as_ref()), Doc::new(tf, sys_ts));
     Ok(())
 }
+/// get the sys_time through the file meta_data    
 fn read_systime_from_path(file_path: impl AsRef<Path>) -> std::io::Result<SystemTime> {
     let meta_data = fs::metadata(file_path.as_ref()).map_err(|err| {
         eprintln!(

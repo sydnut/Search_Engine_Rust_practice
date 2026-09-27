@@ -10,12 +10,12 @@ pub mod model;
 pub use model::*;
 
 pub use file_handler::Handlers;
-use file_handler::{SupportedType, tokenize, walk_and_process};
+use file_handler::{get_handler, tokenize, walk_and_process};
 
-use crate::file_handler::{FileHandler, XmlFileHandler};
+use crate::file_handler::XmlFileHandler;
 /// 驱动函数，读取给定文件夹，然后解析输出到对应文件,写入`Model`
 pub fn index_files(
-    handlers: &mut Handlers,
+    handlers: &Handlers,
     dir_path: impl AsRef<Path>,
     target_path: impl AsRef<Path>,
 ) -> std::io::Result<()> {
@@ -42,7 +42,7 @@ pub fn write_to_disk(model: &Model, target_path: impl AsRef<Path>) -> std::io::R
 /// return the operations model need to execute
 // 返回待修改的批处理操作，不需反复使用读写锁
 pub fn re_index(
-    handlers: &mut Handlers,
+    handlers: &Handlers,
     model: &Model,
 ) -> Result<Option<Bulk<Update>>, Box<dyn Error>> {
     let begin_time = std::time::Instant::now();
@@ -70,8 +70,8 @@ pub fn re_index(
             continue;
         }
         //2 mark diff
-        if let Some(handler) = SupportedType::get_handler(handlers, path) {
-            tokenize(handler.as_mut(), &path, &mut new_model, None)?;
+        if let Some(handler) = get_handler(handlers, path) {
+            tokenize(handler, &path, &mut new_model, None)?;
         } else {
             println!("WARN: Unsupported file:{}", path.display())
         }
@@ -81,8 +81,7 @@ pub fn re_index(
     for entry in walkdir::WalkDir::new(model.source()) {
         let entry = entry?;
         if entry.file_type().is_file()
-            && SupportedType::get_handler(handlers, entry.path())
-                .is_some_and(|handler| handler.validate(entry.path()))
+            && get_handler(handlers, entry.path()).is_some()
             && !index.contains_key(entry.path())
         {
             new_files.push(entry.path().display().to_string());
@@ -119,8 +118,8 @@ pub fn re_index(
     for path_str in new_files {
         let path = Path::new(&path_str);
         //前面已经校验过
-        let handler = SupportedType::get_handler(handlers, path).unwrap();
-        tokenize(handler.as_mut(), &path, &mut new_model, None)?;
+        let handler = get_handler(handlers, path).unwrap();
+        tokenize(handler, &path, &mut new_model, None)?;
     }
     bulk.push(Update::merge(new_model));
     println!(
@@ -131,8 +130,10 @@ pub fn re_index(
 }
 pub fn init_handlers() -> Handlers {
     let mut handlers = Handlers::new();
-    let xml_hd: Box<dyn FileHandler> = Box::new(XmlFileHandler::new());
+    let xml_hd = Box::new(XmlFileHandler::new());
+    let xtml_hd = Box::new(XmlFileHandler::new());
     handlers.insert("xml".into(), xml_hd);
+    handlers.insert("xhtml".into(), xtml_hd);
     // 待处理多拓展名的同一handler
     // handlers.insert("xthml".into(), xml_hd);
     handlers

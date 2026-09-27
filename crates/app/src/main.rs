@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut args = std::env::args();
     args.next();
     let subcommand = args.next().unwrap_or_else(|| "index".to_string());
-    let mut handlers: Handlers = init_handlers();
+    let handlers: Handlers = init_handlers();
 
     match subcommand.as_str() {
         "index" => {
@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .next()
                 .ok_or_else(|| print_usage_and_error(subcommand.as_str()))?;
             let target_path = args.next().unwrap_or_else(|| String::from("index.json"));
-            index_files(&mut handlers, index_path, target_path)?;
+            index_files(&handlers, index_path, target_path)?;
         }
         "search" => {
             let content = args
@@ -58,7 +58,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 const THREAD_NAME: &str = "[SYNC THREAD]";
                 println!("DEBUG: {THREAD_NAME} acquire the read lock");
                 let model = clone.read().unwrap();
-                let bulk = re_index(&mut handlers, &model);
+                let bulk = re_index(&handlers, &model);
                 // 显式释放读锁，防止变量遮蔽产生死锁
                 drop(model);
                 if bulk.is_err() {

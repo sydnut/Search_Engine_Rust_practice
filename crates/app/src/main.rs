@@ -1,7 +1,7 @@
 mod calculate;
 mod http_service;
 use http_service::*;
-use search_core::{Model, re_index, read_xml_dir_and_write, write_to_disk};
+use search_core::{Handlers, Model, index_files, init_handlers, re_index, write_to_disk};
 use std::env::Args;
 use std::error::Error;
 use std::fs::File;
@@ -14,6 +14,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut args = std::env::args();
     args.next();
     let subcommand = args.next().unwrap_or_else(|| "index".to_string());
+    let mut handlers: Handlers = init_handlers();
 
     match subcommand.as_str() {
         "index" => {
@@ -21,7 +22,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .next()
                 .ok_or_else(|| print_usage_and_error(subcommand.as_str()))?;
             let target_path = args.next().unwrap_or_else(|| String::from("index.json"));
-            read_xml_dir_and_write(index_path, target_path)?;
+            index_files(&mut handlers, index_path, target_path)?;
         }
         "search" => {
             let content = args
@@ -57,7 +58,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 const THREAD_NAME: &str = "[SYNC THREAD]";
                 println!("DEBUG: {THREAD_NAME} acquire the read lock");
                 let model = clone.read().unwrap();
-                let bulk = re_index(&model);
+                let bulk = re_index(&mut handlers, &model);
                 // 显式释放读锁，防止变量遮蔽产生死锁
                 drop(model);
                 if bulk.is_err() {

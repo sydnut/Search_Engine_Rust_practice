@@ -302,6 +302,7 @@ mod tests {
     #[test]
     fn reindex_preserves_unchanged_documents_while_updating_and_deleting() {
         let fixture = Fixture::new();
+        let mut handlers = crate::init_handlers();
         let (changed, ts) = fixture.write("changed.xml", "<doc>rust rust fresh</doc>");
         let (unchanged, unchanged_ts) = fixture.write("unchanged.xml", "<doc>rust</doc>");
         let deleted = fixture.0.join("deleted.xml");
@@ -321,7 +322,7 @@ mod tests {
         ]);
         model.with_source(fixture.0.to_string_lossy().into_owned());
 
-        let bulk = crate::re_index(&model).unwrap().unwrap();
+        let bulk = crate::re_index(&mut handlers, &model).unwrap().unwrap();
         model.apply(bulk);
 
         assert_eq!(model.index().len(), 2);
@@ -334,12 +335,13 @@ mod tests {
         assert_eq!(model.index()[&unchanged].get_tf(), &tf(&[("rust", 1)]));
         assert_eq!(model.index()[&unchanged].get_ts(), unchanged_ts);
         assert_eq!(model.df(), &tf(&[("rust", 2), ("fresh", 1)]));
-        assert!(crate::re_index(&model).unwrap().is_none());
+        assert!(crate::re_index(&mut handlers, &model).unwrap().is_none());
     }
 
     #[test]
     fn reindex_handles_deletion_without_modified_documents() {
         let fixture = Fixture::new();
+        let mut handlers = crate::init_handlers();
         let (unchanged, ts) = fixture.write("unchanged.xml", "<doc>rust</doc>");
         let deleted = fixture.0.join("deleted.xml");
         let mut model = model_with_docs(vec![
@@ -347,7 +349,7 @@ mod tests {
             (deleted, Doc::new(tf(&[("rust", 2), ("lost", 1)]), ts)),
         ]);
         model.with_source(fixture.0.to_string_lossy().into_owned());
-        let bulk = crate::re_index(&model).unwrap().unwrap();
+        let bulk = crate::re_index(&mut handlers, &model).unwrap().unwrap();
         model.apply(bulk);
 
         assert_eq!(model.index().len(), 1);
@@ -355,7 +357,7 @@ mod tests {
         assert_eq!(model.df(), &tf(&[("rust", 1)]));
 
         fs::remove_file(&unchanged).unwrap();
-        let bulk = crate::re_index(&model).unwrap().unwrap();
+        let bulk = crate::re_index(&mut handlers, &model).unwrap().unwrap();
         model.apply(bulk);
         assert!(model.is_empty());
     }
@@ -363,13 +365,14 @@ mod tests {
     #[test]
     fn reindex_only_updates_timestamp_when_terms_are_unchanged() {
         let fixture = Fixture::new();
+        let mut handlers = crate::init_handlers();
         let (path, ts) = fixture.write("same.xml", "<doc>rust rust</doc>");
         let mut model = model_with_docs(vec![(
             path.clone(),
             Doc::new(tf(&[("rust", 2)]), ts - Duration::from_secs(1)),
         )]);
         model.with_source(fixture.0.to_string_lossy().into_owned());
-        let bulk = crate::re_index(&model).unwrap().unwrap();
+        let bulk = crate::re_index(&mut handlers, &model).unwrap().unwrap();
         model.apply(bulk);
 
         assert_eq!(model.index()[&path].get_tf(), &tf(&[("rust", 2)]));
@@ -380,6 +383,7 @@ mod tests {
     #[test]
     fn reindex_adds_nested_xml_and_ignores_non_xml_files() {
         let fixture = Fixture::new();
+        let mut handlers = crate::init_handlers();
         let (existing, ts) = fixture.write("existing.xml", "<doc>rust old</doc>");
         let mut model = model_with_docs(vec![(
             existing.clone(),
@@ -387,13 +391,13 @@ mod tests {
         )]);
         model.with_source(fixture.0.to_string_lossy().into_owned());
 
-        assert!(crate::re_index(&model).unwrap().is_none());
+        assert!(crate::re_index(&mut handlers, &model).unwrap().is_none());
         fixture.write("first.xml", "<doc>rust fresh fresh</doc>");
         fs::create_dir(fixture.0.join("nested")).unwrap();
-        fixture.write("nested/second.xhtml", "<doc>fresh other</doc>");
+        fixture.write("nested/second.xml", "<doc>fresh other</doc>");
         fixture.write("README.md", "This is not XML.");
 
-        let bulk = crate::re_index(&model).unwrap().unwrap();
+        let bulk = crate::re_index(&mut handlers, &model).unwrap().unwrap();
         model.apply(bulk);
 
         assert_eq!(model.index().len(), 3);
@@ -406,13 +410,13 @@ mod tests {
             &tf(&[("rust", 1), ("fresh", 2)])
         );
         assert_eq!(
-            model.index()[&fixture.0.join("nested/second.xhtml")].get_tf(),
+            model.index()[&fixture.0.join("nested/second.xml")].get_tf(),
             &tf(&[("fresh", 1), ("other", 1)])
         );
         assert_eq!(
             model.df(),
             &tf(&[("rust", 2), ("old", 1), ("fresh", 2), ("other", 1)])
         );
-        assert!(crate::re_index(&model).unwrap().is_none());
+        assert!(crate::re_index(&mut handlers, &model).unwrap().is_none());
     }
 }

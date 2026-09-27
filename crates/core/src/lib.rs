@@ -4,21 +4,25 @@ use std::fs::{self, File};
 use std::io::{BufWriter, ErrorKind};
 use std::ops::Deref;
 use std::path::Path;
-mod file_process;
+mod file_handler;
 pub mod lexer;
 pub mod model;
 pub use model::*;
 
-use crate::file_process::{check_xml_ext, tokenize_file};
+pub use file_handler::Handlers;
+use file_handler::{SupportedType, tokenize, walk_and_process};
+
+use crate::file_handler::{FileHandler, XmlFileHandler};
 /// 驱动函数，读取给定文件夹，然后解析输出到对应文件,写入`Model`
-pub fn read_xml_dir_and_write(
+pub fn index_files(
+    handlers: &mut Handlers,
     dir_path: impl AsRef<Path>,
     target_path: impl AsRef<Path>,
 ) -> std::io::Result<()> {
     let mut data = Model::default();
     // set source
     data.with_source(dir_path.as_ref().to_string_lossy().into_owned());
-    file_process::for_each_file(dir_path, &mut data)?;
+    walk_and_process(handlers, dir_path, &mut data)?;
     //build the data to be imported
     let tmp_path = target_path.as_ref();
     println!("Writing Index to {:?}", tmp_path);
@@ -37,7 +41,10 @@ pub fn write_to_disk(model: &Model, target_path: impl AsRef<Path>) -> std::io::R
 /// re_index the updated index files,
 /// return the operations model need to execute
 // 返回待修改的批处理操作，不需反复使用读写锁
-pub fn re_index(model: &Model) -> Result<Option<Bulk<Update>>, Box<dyn Error>> {
+pub fn re_index(
+    handlers: &mut Handlers,
+    model: &Model,
+) -> Result<Option<Bulk<Update>>, Box<dyn Error>> {
     let begin_time = std::time::Instant::now();
     // 寻找修改后的文件time，寻找差异diff->diff(tf)，由tf的不同修改DF
     // 返回待批处理对象
@@ -63,14 +70,19 @@ pub fn re_index(model: &Model) -> Result<Option<Bulk<Update>>, Box<dyn Error>> {
             continue;
         }
         //2 mark diff
-        tokenize_file(&path, &mut new_model, Some(sys_ts))?;
+        if let Some(handler) = SupportedType::get_handler(handlers, path) {
+            tokenize(handler.as_mut(), &path, &mut new_model, None)?;
+        } else {
+            println!("WARN: Unsupported file:{}", path.display())
+        }
     }
     // 遍历原目录的所有子文件，比对是否存在新的文件
     let mut new_files = Vec::new();
     for entry in walkdir::WalkDir::new(model.source()) {
         let entry = entry?;
         if entry.file_type().is_file()
-            && check_xml_ext(entry.path())
+            && SupportedType::get_handler(handlers, entry.path())
+                .is_some_and(|handler| handler.validate(entry.path()))
             && !index.contains_key(entry.path())
         {
             new_files.push(entry.path().display().to_string());
@@ -106,7 +118,9 @@ pub fn re_index(model: &Model) -> Result<Option<Bulk<Update>>, Box<dyn Error>> {
     let mut new_model = Box::new(Model::default());
     for path_str in new_files {
         let path = Path::new(&path_str);
-        tokenize_file(&path, &mut new_model, None)?;
+        //前面已经校验过
+        let handler = SupportedType::get_handler(handlers, path).unwrap();
+        tokenize(handler.as_mut(), &path, &mut new_model, None)?;
     }
     bulk.push(Update::merge(new_model));
     println!(
@@ -114,6 +128,14 @@ pub fn re_index(model: &Model) -> Result<Option<Bulk<Update>>, Box<dyn Error>> {
         begin_time.elapsed().as_millis()
     );
     Ok(Some(bulk))
+}
+pub fn init_handlers() -> Handlers {
+    let mut handlers = Handlers::new();
+    let xml_hd: Box<dyn FileHandler> = Box::new(XmlFileHandler::new());
+    handlers.insert("xml".into(), xml_hd);
+    // 待处理多拓展名的同一handler
+    // handlers.insert("xthml".into(), xml_hd);
+    handlers
 }
 #[cfg(test)]
 mod tests {

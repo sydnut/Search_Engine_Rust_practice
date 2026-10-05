@@ -4,7 +4,7 @@ use syn::{Token, parse::Parse, punctuated::Punctuated};
 
 extern crate proc_macro;
 /// 注册处理对应拓展名文件的属性宏，要求实现`FileHandler` trait,并提供new()构造参数，参考例子
-/// ```Rust 
+/// ```Rust
 /// #[regiser_handler(exts=["xml","xhtml"])]
 /// pub(crate) struct XmlFileHandler;
 /// impl FileHandler for XmlFileHandler {

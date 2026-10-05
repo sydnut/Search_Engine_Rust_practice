@@ -6,12 +6,18 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 mod pdf_handler;
 mod xml_handler;
-pub(crate) use pdf_handler::PdfFileHandler;
-pub(crate) use xml_handler::XmlFileHandler;
 
 pub trait FileHandler: Send {
     fn extract_text(&self, file_path: &Path) -> Result<String>;
 }
+//注册器，方便利用inventory收集
+pub struct HandlerRegistration {
+    pub(crate) exts: &'static [&'static str],
+    pub(crate) create: fn() -> Box<dyn FileHandler>,
+}
+//注册Registration
+inventory::collect! {HandlerRegistration}
+
 pub type Handlers = HashMap<String, Box<dyn FileHandler>>;
 /// get the handler of file's type,return none if ext is unvalid or there
 /// is no optional handler

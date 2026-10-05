@@ -12,7 +12,7 @@ pub use model::*;
 pub use file_handler::Handlers;
 use file_handler::{get_handler, tokenize, walk_and_process};
 
-use crate::file_handler::{FileHandler, PdfFileHandler, XmlFileHandler};
+use crate::file_handler::HandlerRegistration;
 /// 驱动函数，读取给定文件夹，然后解析输出到对应文件,写入`Model`
 pub fn index_files(
     handlers: &Handlers,
@@ -130,12 +130,12 @@ pub fn re_index(
 }
 pub fn init_handlers() -> Handlers {
     let mut handlers = Handlers::new();
-    let xml_hd: Box<dyn FileHandler> = Box::new(XmlFileHandler::new());
-    let xtml_hd: Box<dyn FileHandler> = Box::new(XmlFileHandler::new());
-    let pdf_hd: Box<dyn FileHandler> = Box::new(PdfFileHandler::new());
-    handlers.insert("xml".into(), xml_hd);
-    handlers.insert("xhtml".into(), xtml_hd);
-    handlers.insert("pdf".into(), pdf_hd);
+    for registration in inventory::iter::<HandlerRegistration> {
+        for ext in registration.exts {
+            //TODO 以后改成RC
+            handlers.insert(ext.to_string(), (registration.create)());
+        }
+    }
     handlers
 }
 #[cfg(test)]

@@ -1,8 +1,9 @@
 use crate::file_handler::FileHandler;
+use file_register_macro::regiser_handler;
 use lopdf::Document;
 use std::io::{Error, ErrorKind, Result};
 use std::path::Path;
-
+#[regiser_handler(exts = ["pdf"])]
 pub(crate) struct PdfFileHandler;
 impl FileHandler for PdfFileHandler {
     fn extract_text(&self, file_path: &Path) -> Result<String> {
@@ -39,9 +40,6 @@ impl PdfFileHandler {
 }
 #[cfg(test)]
 mod tests {
-    use super::*;
     #[test]
-    fn test_extract_pdf() -> Result<()> {
-        Ok(())
-    }
+    fn test_expand() {}
 }

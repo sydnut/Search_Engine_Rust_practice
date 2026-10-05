@@ -1,7 +1,9 @@
 use crate::file_handler::FileHandler;
+use file_register_macro::regiser_handler;
 use std::io::{BufReader, Error, ErrorKind, Result};
 use std::path::Path;
 use xml::reader::{EventReader, XmlEvent};
+#[regiser_handler(exts=["xml","xhtml"])]
 pub(crate) struct XmlFileHandler;
 impl FileHandler for XmlFileHandler {
     fn extract_text(&self, file_path: &Path) -> Result<String> {

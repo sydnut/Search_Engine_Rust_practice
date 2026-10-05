@@ -10,3 +10,5 @@ snowstem = "0.1.0"
 xml-rs = "1.0.0"
 walkdir = "2.5.0"
 lopdf = "0.45.0"
+inventory = "=0.3.24"
+file-register-macro = {path="./file-register-macro"}
